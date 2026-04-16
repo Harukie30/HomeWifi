@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import type { RegistrationRequest } from "@/lib/models";
+import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
 
 export function AdminDashboard() {
   const router = useRouter();
@@ -67,94 +68,85 @@ export function AdminDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950">
-      <main className="mx-auto w-full max-w-5xl px-6 py-10">
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">Admin Dashboard</p>
-            <h1 className="text-3xl font-semibold">Pending Registrations</h1>
-          </div>
-          <Button variant="outline" onClick={handleLogout}>
-            Logout
-          </Button>
-        </div>
-
-        <Card className="py-0">
-          <CardHeader className="px-6 pt-6">
-            <CardTitle>Requests Queue</CardTitle>
-          </CardHeader>
-          <CardContent className="px-0 pb-0">
-            <Table>
-              <TableHeader>
+    <AdminDashboardShell
+      title="Pending Registrations"
+      onLogout={handleLogout}
+    >
+      <Card className="py-0">
+        <CardHeader className="px-6 pt-6">
+          <CardTitle>Requests Queue</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="px-6">Name</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Phone Model</TableHead>
+                <TableHead>Submitted</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right pr-6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
                 <TableRow>
-                  <TableHead className="px-6">Name</TableHead>
-                  <TableHead>Unit</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Phone Model</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right pr-6">Actions</TableHead>
+                  <TableCell colSpan={7} className="px-6 py-8 text-center">
+                    Loading requests...
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="px-6 py-8 text-center">
-                      Loading requests...
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="px-6 py-8 text-center text-red-600">
+                    {error}
+                  </TableCell>
+                </TableRow>
+              ) : pendingRequests.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="px-6 py-8 text-center text-zinc-500">
+                    No pending requests right now.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pendingRequests.map((request) => (
+                  <TableRow key={request.id}>
+                    <TableCell className="px-6 font-medium">{request.name}</TableCell>
+                    <TableCell>{request.unit}</TableCell>
+                    <TableCell>{request.phone}</TableCell>
+                    <TableCell>{request.phoneModel}</TableCell>
+                    <TableCell>
+                      {new Date(request.submittedAt).toLocaleString("en-US")}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">Pending</Badge>
+                    </TableCell>
+                    <TableCell className="pr-6 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          onClick={() => handleAction(request.id, "approve")}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          onClick={() => handleAction(request.id, "reject")}
+                        >
+                          Reject
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="px-6 py-8 text-center text-red-600">
-                      {error}
-                    </TableCell>
-                  </TableRow>
-                ) : pendingRequests.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="px-6 py-8 text-center text-zinc-500">
-                      No pending requests right now.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  pendingRequests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="px-6 font-medium">{request.name}</TableCell>
-                      <TableCell>{request.unit}</TableCell>
-                      <TableCell>{request.phone}</TableCell>
-                      <TableCell>{request.phoneModel}</TableCell>
-                      <TableCell>
-                        {new Date(request.submittedAt).toLocaleString("en-US")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Pending</Badge>
-                      </TableCell>
-                      <TableCell className="pr-6 text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            className="bg-emerald-600 text-white hover:bg-emerald-700"
-                            onClick={() => handleAction(request.id, "approve")}
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-red-300 text-red-600 hover:bg-red-50"
-                            onClick={() => handleAction(request.id, "reject")}
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </AdminDashboardShell>
   );
 }

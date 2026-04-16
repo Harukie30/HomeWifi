@@ -21,6 +21,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 export type RegisterResidentFormData = {
@@ -43,6 +49,8 @@ export function RegisterResidentModal({
   onClose,
   onRegister,
 }: RegisterResidentModalProps) {
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,6 +59,7 @@ export function RegisterResidentModal({
     unit?: string;
     phone?: string;
     phoneModel?: string;
+    terms?: string;
   }>({});
   const [form, setForm] = useState<RegisterResidentFormData>({
     name: "",
@@ -67,6 +76,7 @@ export function RegisterResidentModal({
       unit?: string;
       phone?: string;
       phoneModel?: string;
+      terms?: string;
     } = {};
 
     if (!form.name.trim()) nextErrors.name = "Name is required.";
@@ -78,6 +88,9 @@ export function RegisterResidentModal({
     }
     if (!form.phoneModel.trim()) {
       nextErrors.phoneModel = "Phone model is required.";
+    }
+    if (!hasAcceptedTerms) {
+      nextErrors.terms = "You must accept the Terms & Agreement.";
     }
 
     if (Object.keys(nextErrors).length > 0) {
@@ -108,6 +121,7 @@ export function RegisterResidentModal({
         phone: "",
         phoneModel: "",
       });
+      setHasAcceptedTerms(false);
       setFormErrors({});
       setPhoneError("");
       toast.success("Registration request sent successfully.");
@@ -300,20 +314,49 @@ export function RegisterResidentModal({
             </div>
 
             <div className="flex items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="min-w-24 cursor-pointer rounded-full bg-amber-500 px-3 text-xs text-black hover:bg-amber-600 hover:text-white"
-              >
-                {isSubmitting ? (
-                  <span className="inline-flex items-center gap-2">
-                    <Spinner className="size-3.5" />
-                    Sending...
-                  </span>
-                ) : (
-                  "Register"
-                )}
-              </Button>
+              <div className="mr-auto space-y-1">
+                <p className="inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
+                  Please review and accept the
+                  <button
+                    type="button"
+                    className="font-medium text-amber-700 underline underline-offset-2 dark:text-amber-400"
+                    onClick={() => setIsTermsModalOpen(true)}
+                  >
+                    Terms & Agreement
+                  </button>
+                  .
+                </p>
+                {formErrors.terms ? (
+                  <p className="text-xs text-red-600 dark:text-red-400">
+                    {formErrors.terms}
+                  </p>
+                ) : null}
+              </div>
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !hasAcceptedTerms}
+                        className="min-w-24 cursor-pointer rounded-full bg-amber-500 px-3 text-xs text-black hover:bg-amber-600 hover:text-white"
+                      >
+                        {isSubmitting ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Spinner className="size-3.5" />
+                            Sending...
+                          </span>
+                        ) : (
+                          "Register"
+                        )}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Read and accept the Terms & Agreement before registering.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {submitError ? (
               <p className="text-xs text-red-600 dark:text-red-400">{submitError}</p>
@@ -321,6 +364,54 @@ export function RegisterResidentModal({
           </form>
         </CardContent>
       </Card>
+      {isTermsModalOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+          onClick={() => setIsTermsModalOpen(false)}
+        >
+          <Card
+            className="w-full max-w-md border-zinc-200 bg-white py-0 dark:border-zinc-800 dark:bg-zinc-900"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <CardHeader className="px-5 pt-5">
+              <CardTitle className="text-lg">Terms & Agreement</CardTitle>
+              <CardDescription>
+                Please review and accept before submitting your registration.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-5 pb-5 text-sm text-zinc-700 dark:text-zinc-300">
+              <p>
+                By registering, you confirm the details you provided are correct
+                and authorize Abella Home admin to review your request.
+              </p>
+              <p>
+                WiFi access is for authorized resident use only and may be
+                suspended if policy violations are found.
+              </p>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsTermsModalOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-amber-500 text-black hover:bg-amber-600 hover:text-white"
+                  onClick={() => {
+                    setHasAcceptedTerms(true);
+                    setFormErrors((current) => ({ ...current, terms: undefined }));
+                    setIsTermsModalOpen(false);
+                  }}
+                >
+                  Accept
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
