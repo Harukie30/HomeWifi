@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import type { RegistrationRequest } from "@/lib/models";
 import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
+import { toast } from "sonner";
 
 export function AdminDashboard() {
   const router = useRouter();
@@ -58,9 +59,16 @@ export function AdminDashboard() {
   }
 
   async function handleLogout() {
-    await fetch("/api/admin/logout", { method: "POST" });
-    router.push("/admin/login");
-    router.refresh();
+    const response = await fetch("/api/admin/logout", { method: "POST" });
+    if (response.ok) {
+      toast.success("You have been logged out.");
+    } else {
+      toast.error("Could not log out. Please try again.");
+    }
+    window.setTimeout(() => {
+      router.push("/admin/login");
+      router.refresh();
+    }, 200);
   }
 
   useEffect(() => {
@@ -68,13 +76,10 @@ export function AdminDashboard() {
   }, []);
 
   return (
-    <AdminDashboardShell
-      title="Pending Registrations"
-      onLogout={handleLogout}
-    >
+    <AdminDashboardShell title="Pending requests" onLogout={handleLogout}>
       <Card className="py-0">
         <CardHeader className="px-6 pt-6">
-          <CardTitle>Requests Queue</CardTitle>
+          <CardTitle>Pending requests</CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
           <Table>

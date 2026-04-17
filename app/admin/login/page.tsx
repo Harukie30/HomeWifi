@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -50,15 +51,20 @@ export default function AdminLoginPage() {
 
     if (!response.ok) {
       const payload = (await response.json()) as { error?: string };
-      setError(payload.error ?? "Login failed. Please try again.");
+      const message = payload.error ?? "Login failed. Please try again.";
+      setError(message);
+      toast.error(message);
       setIsSubmitting(false);
       setLoginProgress(0);
       return;
     }
 
     setLoginProgress(100);
-    router.push("/admin");
-    router.refresh();
+    toast.success("Signed in successfully.");
+    window.setTimeout(() => {
+      router.push("/admin");
+      router.refresh();
+    }, 200);
   }
 
   return (
