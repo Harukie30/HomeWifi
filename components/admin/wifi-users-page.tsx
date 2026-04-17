@@ -9,6 +9,8 @@ import { AdminLoadingDialog } from "@/components/admin/admin-loading-dialog";
 import { WifiUsersTable } from "@/components/admin/wifi-users-table";
 import type { Resident } from "@/lib/models";
 
+const REMOVE_SPINNER_MIN_MS = 2500;
+
 export function WifiUsersPage() {
   const router = useRouter();
   const [residents, setResidents] = useState<Resident[]>([]);
@@ -52,6 +54,7 @@ export function WifiUsersPage() {
   }
 
   async function handleConfirmRemoveAccess(resident: Resident) {
+    const removeStartedAt = Date.now();
     setRemovingId(resident.id);
     try {
       const response = await fetch(
@@ -72,6 +75,11 @@ export function WifiUsersPage() {
       toast.success(`${resident.name} was removed from WiFi access.`);
       await loadResidents();
     } finally {
+      const elapsedMs = Date.now() - removeStartedAt;
+      const remainingMs = Math.max(0, REMOVE_SPINNER_MIN_MS - elapsedMs);
+      if (remainingMs > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remainingMs));
+      }
       setRemovingId(null);
     }
   }

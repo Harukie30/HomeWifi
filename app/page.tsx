@@ -26,12 +26,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   RegisterResidentModal,
   type RegisterResidentFormData,
 } from "@/components/register-resident-modal";
 import { WifiAccessQrCard } from "@/components/wifi-access-qr-card";
 
 type AccessStatus = "idle" | "approved" | "pending" | "rejected" | "not_found";
+const PASSWORD_VIEW_WINDOW_SECONDS = 4 * 60;
 
 function FooterBackdrop() {
   return (
@@ -98,6 +108,14 @@ export default function Home() {
   const [statusMessage, setStatusMessage] = useState("");
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [accessStatus, setAccessStatus] = useState<AccessStatus>("idle");
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isRequestingPasswordView, setIsRequestingPasswordView] = useState(false);
+  const [canViewPassword, setCanViewPassword] = useState(false);
+  const [passwordViewExpiresAt, setPasswordViewExpiresAt] = useState<number | null>(
+    null
+  );
+  const [secondsRemaining, setSecondsRemaining] = useState(0);
+  const [hasPendingPasswordRequest, setHasPendingPasswordRequest] = useState(false);
   const [approvedIdentity, setApprovedIdentity] = useState<{
     name: string;
     unit: string;
@@ -145,7 +163,12 @@ export default function Home() {
     event.preventDefault();
     setStatusError("");
     setStatusMessage("");
+    setIsStatusDialogOpen(false);
     setApprovedIdentity(null);
+    setCanViewPassword(false);
+    setPasswordViewExpiresAt(null);
+    setSecondsRemaining(0);
+    setHasPendingPasswordRequest(false);
 
     const phoneDigits = statusPhone.replace(/\D/g, "");
     if (!statusName.trim()) {
@@ -170,7 +193,13 @@ export default function Home() {
       const payload = (await response.json()) as {
         error?: string;
         status?: AccessStatus;
-        request?: { name: string; unit: string };
+        request?: { name: string; unit: string; phone: string };
+        reveal?: {
+          canViewPassword: boolean;
+          hasPendingRequest: boolean;
+          secondsRemaining: number;
+          visibleUntil: string | null;
+        };
       };
       if (!response.ok) {
         setStatusError(payload.error ?? "Could not check status right now.");
@@ -186,22 +215,76 @@ export default function Home() {
           name: payload.request.name,
           unit: payload.request.unit,
         });
-        setStatusMessage("Approved! You may now connect to WiFi.");
+        if (payload.reveal?.canViewPassword) {
+          const serverSeconds = Math.max(
+            0,
+            payload.reveal.secondsRemaining || PASSWORD_VIEW_WINDOW_SECONDS
+          );
+          setCanViewPassword(true);
+          setSecondsRemaining(serverSeconds);
+          setPasswordViewExpiresAt(Date.now() + serverSeconds * 1000);
+          setStatusMessage("Approved! You may now connect to WiFi.");
+        } else {
+          setHasPendingPasswordRequest(!!payload.reveal?.hasPendingRequest);
+          setStatusMessage(
+            payload.reveal?.hasPendingRequest
+              ? "Your password-view request is pending admin approval."
+              : "Approved. Request access to view WiFi credentials."
+          );
+          setIsStatusDialogOpen(true);
+        }
       } else if (status === "pending") {
         setStatusMessage(
           "Your registration is still pending review. Please wait for admin approval."
         );
+        setIsStatusDialogOpen(true);
       } else if (status === "rejected") {
         setStatusMessage(
           "Your request was rejected. Please contact admin or submit a new request."
         );
+        setIsStatusDialogOpen(true);
       } else {
         setStatusMessage(
           "No registration found with that name and phone number yet."
         );
+        setIsStatusDialogOpen(true);
       }
     } finally {
       setIsCheckingStatus(false);
+    }
+  }
+
+  async function handleRequestPasswordView() {
+    if (!statusName.trim() || !/^09\d{9}$/.test(statusPhone.replace(/\D/g, ""))) {
+      setStatusError("Enter the same valid name and phone to request access.");
+      return;
+    }
+
+    setStatusError("");
+    setIsRequestingPasswordView(true);
+    try {
+      const response = await fetch("/api/access/reveal-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: statusName.trim(),
+          phone: statusPhone.replace(/\D/g, ""),
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        setStatusError(payload.error ?? "Could not submit request right now.");
+        return;
+      }
+      setHasPendingPasswordRequest(true);
+      setStatusMessage(
+        "Request sent. Please wait for admin approval to show WiFi credentials."
+      );
+      setIsStatusDialogOpen(true);
+    } finally {
+      setIsRequestingPasswordView(false);
     }
   }
 
@@ -232,6 +315,25 @@ export default function Home() {
     }, 10000);
     return () => clearInterval(intervalId);
   }, [hasEntered]);
+
+  useEffect(() => {
+    if (!canViewPassword || !passwordViewExpiresAt) return;
+    const intervalId = window.setInterval(() => {
+      const next = Math.max(
+        0,
+        Math.ceil((passwordViewExpiresAt - Date.now()) / 1000)
+      );
+      setSecondsRemaining(next);
+      if (next <= 0) {
+        setCanViewPassword(false);
+        setPasswordViewExpiresAt(null);
+        setStatusMessage(
+          "Access window expired. Request admin again to view WiFi credentials."
+        );
+      }
+    }, 1000);
+    return () => clearInterval(intervalId);
+  }, [canViewPassword, passwordViewExpiresAt]);
 
   if (isLoading) {
     return (
@@ -571,15 +673,77 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          {accessStatus === "approved" ? (
+          {accessStatus === "approved" && canViewPassword ? (
             <WifiAccessQrCard
               ssid={wifiSsid}
               password={wifiPassword}
               qrImagePath={wifiQrImagePath}
               residentName={approvedIdentity?.name}
               unit={approvedIdentity?.unit}
+              secondsRemaining={secondsRemaining}
             />
           ) : null}
+
+          {accessStatus === "approved" && !canViewPassword ? (
+            <Card className="border-amber-200/70 bg-white/90 py-0 shadow-sm dark:border-amber-900/50 dark:bg-zinc-900/80">
+              <CardContent className="space-y-3 px-5 pb-5 pt-5">
+                <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                  Credential view is locked. Request admin approval to reveal your
+                  WiFi QR/password for a limited time.
+                </p>
+                <Button
+                  type="button"
+                  className="rounded-full bg-amber-500 text-black hover:bg-amber-600 hover:text-white"
+                  onClick={() => void handleRequestPasswordView()}
+                  disabled={isRequestingPasswordView || hasPendingPasswordRequest}
+                >
+                  {isRequestingPasswordView ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner className="size-3.5" />
+                      Sending request...
+                    </span>
+                  ) : hasPendingPasswordRequest ? (
+                    "Request pending approval"
+                  ) : (
+                    "Request to show password"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
+
+          <AlertDialog
+            open={isStatusDialogOpen}
+            onOpenChange={setIsStatusDialogOpen}
+          >
+            <AlertDialogContent size="default">
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {accessStatus === "approved"
+                    ? hasPendingPasswordRequest
+                      ? "Password-view request pending"
+                      : "Password view locked"
+                    : accessStatus === "pending"
+                    ? "Request still pending"
+                    : accessStatus === "rejected"
+                    ? "Request was rejected"
+                    : "No registration found"}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {statusMessage ||
+                    "Please check your submitted details and try again."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogAction
+                  type="button"
+                  onClick={() => setIsStatusDialogOpen(false)}
+                >
+                  Okay
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </section>
 
         <div className="mt-auto pt-2">

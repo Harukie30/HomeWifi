@@ -28,3 +28,17 @@ model Resident {
 
   @@index([unit])
 }
+
+model PasswordRevealRequest {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String
+  unit        String
+  status      String   @default("pending")
+  requestedAt DateTime @default(now())
+  resolvedAt  DateTime?
+  visibleUntil DateTime?
+
+  @@index([status])
+  @@index([phone])
+}

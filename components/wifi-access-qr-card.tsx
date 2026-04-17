@@ -14,6 +14,7 @@ type WifiAccessQrCardProps = {
   qrImagePath?: string;
   residentName?: string;
   unit?: string;
+  secondsRemaining?: number;
 };
 
 export function WifiAccessQrCard({
@@ -22,6 +23,7 @@ export function WifiAccessQrCard({
   qrImagePath,
   residentName,
   unit,
+  secondsRemaining = 0,
 }: WifiAccessQrCardProps) {
   async function copyText(label: string, value: string) {
     try {
@@ -31,6 +33,10 @@ export function WifiAccessQrCard({
       toast.error(`Could not copy ${label.toLowerCase()}.`);
     }
   }
+
+  const minutes = Math.floor(secondsRemaining / 60);
+  const seconds = secondsRemaining % 60;
+  const remainingText = `${minutes}:${seconds.toString().padStart(2, "0")}`;
 
   return (
     <Card className="overflow-hidden border-emerald-200/70 bg-white/95 py-0 shadow-sm dark:border-emerald-900/45 dark:bg-zinc-900/85">
@@ -51,6 +57,9 @@ export function WifiAccessQrCard({
           {residentName ? `${residentName},` : "You"} can now connect using this
           WiFi credential.
           {unit ? ` Unit ${unit}.` : ""}
+        </p>
+        <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+          View expires in {remainingText}
         </p>
       </CardHeader>
       <CardContent className="space-y-4 px-5 pb-5 pt-5">

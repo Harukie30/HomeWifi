@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { RegistrationRequest } from "@/lib/models";
+import type { PasswordRevealRequest, RegistrationRequest } from "@/lib/models";
 import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
 import { AdminLoadingDialog } from "@/components/admin/admin-loading-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +25,9 @@ const LOGOUT_DIALOG_MIN_MS = 2500;
 export function AdminDashboard() {
   const router = useRouter();
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
+  const [passwordRevealRequests, setPasswordRevealRequests] = useState<
+    PasswordRevealRequest[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState("");
@@ -42,23 +45,30 @@ export function AdminDashboard() {
     }
     setError("");
     try {
-      const response = await fetch("/api/admin/requests", { cache: "no-store" });
+      const [registrationResponse, revealResponse] = await Promise.all([
+        fetch("/api/admin/requests", { cache: "no-store" }),
+        fetch("/api/admin/password-reveal-requests", { cache: "no-store" }),
+      ]);
 
-      if (response.status === 401) {
+      if (registrationResponse.status === 401 || revealResponse.status === 401) {
         router.push("/admin/login");
         return;
       }
 
-      if (!response.ok) {
+      if (!registrationResponse.ok || !revealResponse.ok) {
         setError("Failed to load registration requests.");
         toast.error("Could not load requests.");
         return;
       }
 
-      const payload = (await response.json()) as {
+      const payload = (await registrationResponse.json()) as {
         requests: RegistrationRequest[];
       };
+      const revealPayload = (await revealResponse.json()) as {
+        requests: PasswordRevealRequest[];
+      };
       setRequests(payload.requests);
+      setPasswordRevealRequests(revealPayload.requests);
     } finally {
       if (!silent) {
         const elapsedMs = Date.now() - loadStartedAt;
@@ -108,6 +118,51 @@ export function AdminDashboard() {
           action === "approve"
             ? `Approved — ${who} now has WiFi access.`
             : `Rejected — ${who} was not added to WiFi.`,
+        error: (err) =>
+          err instanceof Error ? err.message : "Something went wrong.",
+      }
+    );
+  }
+
+  async function handleRevealAction(
+    requestId: string,
+    action: "approve" | "reject"
+  ) {
+    const row = passwordRevealRequests.find((r) => r.id === requestId);
+    const who = row ? `${row.name} · Unit ${row.unit}` : "This request";
+
+    await toast.promise(
+      (async () => {
+        const response = await fetch(
+          `/api/admin/password-reveal-requests/${requestId}/${action}`,
+          { method: "POST" }
+        );
+        if (response.status === 401) {
+          router.push("/admin/login");
+          throw new Error("Session expired. Please sign in again.");
+        }
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          throw new Error(
+            body.error ??
+              (action === "approve"
+                ? "Could not approve this password request."
+                : "Could not reject this password request.")
+          );
+        }
+        await loadRequests({ silent: true });
+      })(),
+      {
+        loading:
+          action === "approve"
+            ? "Approving password-view request…"
+            : "Rejecting password-view request…",
+        success:
+          action === "approve"
+            ? `Approved — ${who} can now view WiFi password for 4 minutes.`
+            : `Rejected — ${who}'s password-view request was denied.`,
         error: (err) =>
           err instanceof Error ? err.message : "Something went wrong.",
       }
@@ -250,6 +305,111 @@ export function AdminDashboard() {
               )}
             </TableBody>
           </Table>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4 overflow-hidden py-0">
+        <CardHeader className="px-4 pt-5 sm:px-6 sm:pt-6">
+          <CardTitle className="text-lg sm:text-xl">
+            Password show requests
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+            <Table className="min-w-[680px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="px-4 sm:px-6">Name</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Requested</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right pr-4 sm:pr-6">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  Array.from({ length: 4 }).map((_, row) => (
+                    <TableRow key={row}>
+                      <TableCell className="px-4 sm:px-6">
+                        <Skeleton className="h-4 w-28" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-12" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-28" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-4 w-32" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="h-6 w-16 rounded-full" />
+                      </TableCell>
+                      <TableCell className="pr-4 sm:pr-6">
+                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                          <Skeleton className="h-8 w-20 rounded-md sm:h-7" />
+                          <Skeleton className="h-8 w-20 rounded-md sm:h-7" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : passwordRevealRequests.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="px-4 py-8 text-center text-zinc-500 sm:px-6"
+                    >
+                      No pending password-view requests.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  passwordRevealRequests.map((request) => (
+                    <TableRow key={request.id}>
+                      <TableCell className="max-w-[140px] px-4 font-medium sm:max-w-none sm:px-6">
+                        <span className="line-clamp-2 sm:line-clamp-none">
+                          {request.name}
+                        </span>
+                      </TableCell>
+                      <TableCell>{request.unit}</TableCell>
+                      <TableCell>{request.phone}</TableCell>
+                      <TableCell>
+                        {new Date(request.requestedAt).toLocaleString("en-US")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Pending</Badge>
+                      </TableCell>
+                      <TableCell className="pr-4 text-right sm:pr-6">
+                        <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                          <Button
+                            size="sm"
+                            className="w-full min-w-[5.5rem] bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto"
+                            onClick={() =>
+                              handleRevealAction(request.id, "approve")
+                            }
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full min-w-[5.5rem] border-red-300 text-red-600 hover:bg-red-50 sm:w-auto"
+                            onClick={() =>
+                              handleRevealAction(request.id, "reject")
+                            }
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
