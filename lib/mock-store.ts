@@ -141,16 +141,17 @@ export async function getLatestRegistrationByIdentity(
   name: string,
   phone: string
 ): Promise<RegistrationRequest | null> {
-  const row = await prisma.registrationRequest.findFirst({
+  const normalizedName = name.trim().toLowerCase();
+  const rows = await prisma.registrationRequest.findMany({
     where: {
-      name: {
-        equals: name.trim(),
-        mode: "insensitive",
-      },
       phone: phone.trim(),
     },
     orderBy: { submittedAt: "desc" },
   });
+  const row = rows.find(
+    (item: { name: string }) =>
+      item.name.trim().toLowerCase() === normalizedName
+  );
   if (!row) return null;
   return toRegistrationRequest(row);
 }
