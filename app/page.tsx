@@ -22,10 +22,46 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import {
   RegisterResidentModal,
   type RegisterResidentFormData,
 } from "@/components/register-resident-modal";
+import { WifiAccessQrCard } from "@/components/wifi-access-qr-card";
+
+type AccessStatus = "idle" | "approved" | "pending" | "rejected" | "not_found";
+
+function FooterBackdrop() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 overflow-hidden"
+      aria-hidden
+    >
+      {/* Base wash — warm floor, cool upper fade */}
+      <div className="absolute inset-0 bg-gradient-to-t from-amber-100/50 via-white/40 to-transparent dark:from-amber-950/25 dark:via-zinc-950/40 dark:to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_120%_80%_at_50%_100%,rgba(251,191,36,0.18),transparent_55%)] dark:bg-[radial-gradient(ellipse_120%_80%_at_50%_100%,rgba(245,158,11,0.12),transparent_55%)]" />
+      {/* Orbs */}
+      <div className="absolute -bottom-20 -left-16 h-72 w-72 rounded-full bg-gradient-to-tr from-amber-400/25 via-orange-300/15 to-transparent blur-3xl dark:from-amber-600/15 dark:via-orange-600/10" />
+      <div className="absolute -bottom-12 right-[-10%] h-80 w-80 rounded-full bg-gradient-to-bl from-sky-400/20 via-cyan-300/12 to-transparent blur-3xl dark:from-sky-600/12 dark:via-cyan-700/8" />
+      <div className="absolute bottom-1/4 left-1/3 h-40 w-40 rounded-full bg-violet-400/10 blur-2xl dark:bg-violet-500/8" />
+      {/* Grid hint */}
+      <div
+        className="absolute inset-0 opacity-[0.35] dark:opacity-[0.2]"
+        style={{
+          backgroundImage: `linear-gradient(rgba(120,113,108,0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(120,113,108,0.06) 1px, transparent 1px)`,
+          backgroundSize: "32px 32px",
+        }}
+      />
+      {/* Geometric rings & lines */}
+      <div className="absolute bottom-[8%] left-[6%] h-24 w-24 rounded-full border border-amber-500/15 dark:border-amber-400/10" />
+      <div className="absolute bottom-[12%] right-[10%] h-16 w-16 rotate-6 rounded-2xl border border-sky-500/20 dark:border-sky-500/12" />
+      <div className="absolute bottom-6 left-1/2 h-px w-40 -translate-x-1/2 bg-gradient-to-r from-transparent via-amber-400/35 to-transparent dark:via-amber-500/20" />
+    </div>
+  );
+}
 
 function HeroShapes() {
   return (
@@ -56,7 +92,22 @@ export default function Home() {
   const [residents, setResidents] = useState<Resident[]>([]);
   const [isLoadingResidents, setIsLoadingResidents] = useState(true);
   const [requestSubmittedMessage, setRequestSubmittedMessage] = useState("");
+  const [statusName, setStatusName] = useState("");
+  const [statusPhone, setStatusPhone] = useState("");
+  const [statusError, setStatusError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [accessStatus, setAccessStatus] = useState<AccessStatus>("idle");
+  const [approvedIdentity, setApprovedIdentity] = useState<{
+    name: string;
+    unit: string;
+  } | null>(null);
   const hasResidents = residents.length > 0;
+
+  const wifiSsid = process.env.NEXT_PUBLIC_WIFI_SSID?.trim() || "AbellaHome_WiFi";
+  const wifiPassword =
+    process.env.NEXT_PUBLIC_WIFI_PASSWORD?.trim() || "ChangeMe123";
+  const wifiQrImagePath = process.env.NEXT_PUBLIC_WIFI_QR_PATH?.trim() || "/wifi-qr.png";
 
   async function fetchResidents() {
     try {
@@ -88,6 +139,70 @@ export default function Home() {
       "Your registration request has been submitted. Please wait for approval."
     );
     return true;
+  }
+
+  async function handleCheckStatus(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatusError("");
+    setStatusMessage("");
+    setApprovedIdentity(null);
+
+    const phoneDigits = statusPhone.replace(/\D/g, "");
+    if (!statusName.trim()) {
+      setStatusError("Please enter your full name.");
+      return;
+    }
+    if (!/^09\d{9}$/.test(phoneDigits)) {
+      setStatusError("Use a valid 11-digit phone number starting with 09.");
+      return;
+    }
+
+    setIsCheckingStatus(true);
+    try {
+      const response = await fetch("/api/access/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: statusName.trim(),
+          phone: phoneDigits,
+        }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        status?: AccessStatus;
+        request?: { name: string; unit: string };
+      };
+      if (!response.ok) {
+        setStatusError(payload.error ?? "Could not check status right now.");
+        setAccessStatus("idle");
+        return;
+      }
+
+      const status = payload.status ?? "not_found";
+      setAccessStatus(status);
+
+      if (status === "approved" && payload.request) {
+        setApprovedIdentity({
+          name: payload.request.name,
+          unit: payload.request.unit,
+        });
+        setStatusMessage("Approved! You may now connect to WiFi.");
+      } else if (status === "pending") {
+        setStatusMessage(
+          "Your registration is still pending review. Please wait for admin approval."
+        );
+      } else if (status === "rejected") {
+        setStatusMessage(
+          "Your request was rejected. Please contact admin or submit a new request."
+        );
+      } else {
+        setStatusMessage(
+          "No registration found with that name and phone number yet."
+        );
+      }
+    } finally {
+      setIsCheckingStatus(false);
+    }
   }
 
   useEffect(() => {
@@ -164,27 +279,89 @@ export default function Home() {
           sizes="(max-width: 640px) 88px, (max-width: 1024px) 130px, 190px"
           className="pointer-events-none absolute bottom-3 right-3 z-0 h-auto w-22 opacity-80 drop-shadow-lg dark:opacity-60 sm:bottom-6 sm:right-6 sm:w-32 lg:bottom-10 lg:right-10 lg:w-[290px]"
         />
-        <section className="relative z-10 mx-auto w-full max-w-2xl rounded-3xl border border-zinc-200/80 bg-white/70 p-8 text-center shadow-xl shadow-zinc-900/10 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-black/30">
-          <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-700/90 dark:text-amber-400/90">
-            Abella Home
-          </p>
-          <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
-            Welcome to Abella Home Apartment WiFi
-          </h1>
-          <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
-            Check your building WiFi access and submit your registration request.
-          </p>
-          <Button
-            size="lg"
-            className="mt-8 h-12 min-w-40 cursor-pointer bg-amber-500 hover:bg-amber-600 hover:text-white text-black rounded-full px-8 text-base"
-            onClick={() => {
-              setLoadingValue(10);
-              setIsLoading(true);
-            }}
-          >
-            Enter
-          </Button>
-        </section>
+        <div className="relative z-10 mx-auto w-full max-w-2xl">
+          <section className="rounded-3xl border border-zinc-200/80 bg-white/70 p-8 text-center shadow-xl shadow-zinc-900/10 backdrop-blur-md dark:border-zinc-800 dark:bg-zinc-900/60 dark:shadow-black/30">
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-amber-700/90 dark:text-amber-400/90">
+              Abella Home
+            </p>
+            <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-5xl">
+              Welcome to Abella Home Apartment WiFi
+            </h1>
+            <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed text-zinc-600 dark:text-zinc-400">
+              Check your building WiFi access and submit your registration
+              request.
+            </p>
+            <Button
+              size="lg"
+              className="mt-8 h-12 min-w-40 cursor-pointer rounded-full bg-amber-500 px-8 text-base text-black hover:bg-amber-600 hover:text-white"
+              onClick={() => {
+                setLoadingValue(10);
+                setIsLoading(true);
+              }}
+            >
+              Enter
+            </Button>
+          </section>
+          <div className="mx-auto mt-5 w-full max-w-lg rounded-2xl border border-zinc-200/70 bg-white/55 px-4 py-3 text-center shadow-sm shadow-zinc-900/5 backdrop-blur-md dark:border-zinc-800/70 dark:bg-zinc-900/45 dark:shadow-black/20">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-zinc-500 dark:text-zinc-400">
+              Made by Harukie
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
+              Reach out or view portfolio links below
+            </p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2.5">
+              <a
+                href="mailto:AbellaHome@gmail.com?subject=Abella%20Home%20WiFi%20Portal"
+                aria-label="Email creator"
+                title="Email"
+                className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300/80 bg-white/85 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900/75 dark:hover:border-amber-500/70"
+              >
+                <Image
+                  src="/Gmail.png"
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="h-6 w-6 object-contain transition-transform group-hover:scale-105"
+                  aria-hidden
+                />
+              </a>
+              <a
+                href="https://github.com/Harukie30?tab=overview&from=2025-12-01&to=2025-12-31"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="GitHub profile"
+                title="GitHub"
+                className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300/80 bg-white/85 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900/75 dark:hover:border-amber-500/70"
+              >
+                <Image
+                  src="/Git.png"
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="h-6 w-6 object-contain transition-transform group-hover:scale-105"
+                  aria-hidden
+                />
+              </a>
+              <a
+                href="https://my-portfolio-amadeus.netlify.app/"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="LinkedIn profile"
+                title="LinkedIn"
+                className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-300/80 bg-white/85 shadow-sm transition-all hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900/75 dark:hover:border-amber-500/70"
+              >
+                <Image
+                  src="/port.png"
+                  alt=""
+                  width={18}
+                  height={18}
+                  className="h-6 w-6 object-contain transition-transform group-hover:scale-105"
+                  aria-hidden
+                />
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -325,6 +502,86 @@ export default function Home() {
           </Card>
         </section>
 
+        <section
+          className="space-y-3"
+          aria-labelledby="check-status-heading"
+        >
+          <h2
+            id="check-status-heading"
+            className="text-sm font-medium text-zinc-500 dark:text-zinc-400"
+          >
+            Check approval status
+          </h2>
+          <Card className="border-zinc-200/90 bg-white/90 py-0 shadow-sm ring-1 ring-zinc-200/40 backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 dark:ring-zinc-800/60">
+            <CardContent className="space-y-4 px-5 pb-5 pt-5">
+              <form
+                className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"
+                onSubmit={handleCheckStatus}
+              >
+                <div className="space-y-1.5">
+                  <Label htmlFor="status-name">Name</Label>
+                  <Input
+                    id="status-name"
+                    value={statusName}
+                    onChange={(e) => setStatusName(e.target.value)}
+                    placeholder="Juan Dela Cruz"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="status-phone">Phone number</Label>
+                  <Input
+                    id="status-phone"
+                    value={statusPhone}
+                    onChange={(e) =>
+                      setStatusPhone(e.target.value.replace(/\D/g, "").slice(0, 11))
+                    }
+                    placeholder="09XXXXXXXXX"
+                    inputMode="numeric"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  className="h-10 rounded-full bg-amber-500 text-black hover:bg-amber-600 hover:text-white"
+                  disabled={isCheckingStatus}
+                >
+                  {isCheckingStatus ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Spinner className="size-3.5" />
+                      Checking...
+                    </span>
+                  ) : (
+                    "Check status"
+                  )}
+                </Button>
+              </form>
+              {statusError ? (
+                <p className="text-sm text-red-600 dark:text-red-400">{statusError}</p>
+              ) : null}
+              {statusMessage ? (
+                <p
+                  className={`text-sm ${
+                    accessStatus === "approved"
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-zinc-600 dark:text-zinc-300"
+                  }`}
+                >
+                  {statusMessage}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          {accessStatus === "approved" ? (
+            <WifiAccessQrCard
+              ssid={wifiSsid}
+              password={wifiPassword}
+              qrImagePath={wifiQrImagePath}
+              residentName={approvedIdentity?.name}
+              unit={approvedIdentity?.unit}
+            />
+          ) : null}
+        </section>
+
         <div className="mt-auto pt-2">
           <Button
             size="lg"
@@ -344,8 +601,9 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="border-t border-zinc-200/80 bg-gradient-to-b from-white/90 to-zinc-50/70 dark:border-zinc-800 dark:from-zinc-900/50 dark:to-zinc-950/80">
-        <div className="mx-auto w-full max-w-3xl px-6 py-10">
+      <footer className="relative overflow-hidden border-t border-zinc-200/80 bg-gradient-to-b from-zinc-50/95 via-white/90 to-amber-50/30 dark:border-zinc-800 dark:from-zinc-950 dark:via-zinc-950/95 dark:to-zinc-950">
+        <FooterBackdrop />
+        <div className="relative z-10 mx-auto w-full max-w-3xl px-6 py-10">
           <div className="grid gap-4 text-sm sm:grid-cols-3">
             <Card className="border-zinc-200/80 bg-white/85 py-0 shadow-sm dark:border-zinc-800 dark:bg-zinc-900/70">
               <CardContent className="space-y-2 p-4">

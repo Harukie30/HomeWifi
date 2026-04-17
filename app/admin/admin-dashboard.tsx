@@ -19,10 +19,14 @@ import { AdminLoadingDialog } from "@/components/admin/admin-loading-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
+const LOADING_DIALOG_MIN_MS = 2500;
+const LOGOUT_DIALOG_MIN_MS = 2500;
+
 export function AdminDashboard() {
   const router = useRouter();
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [error, setError] = useState("");
 
   const pendingRequests = useMemo(
@@ -32,6 +36,7 @@ export function AdminDashboard() {
 
   async function loadRequests(options?: { silent?: boolean }) {
     const silent = options?.silent ?? false;
+    const loadStartedAt = Date.now();
     if (!silent) {
       setIsLoading(true);
     }
@@ -56,6 +61,11 @@ export function AdminDashboard() {
       setRequests(payload.requests);
     } finally {
       if (!silent) {
+        const elapsedMs = Date.now() - loadStartedAt;
+        const remainingMs = Math.max(0, LOADING_DIALOG_MIN_MS - elapsedMs);
+        if (remainingMs > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, remainingMs));
+        }
         setIsLoading(false);
       }
     }
@@ -105,16 +115,24 @@ export function AdminDashboard() {
   }
 
   async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    const logoutStartedAt = Date.now();
     const response = await fetch("/api/admin/logout", { method: "POST" });
     if (response.ok) {
       toast.success("You have been logged out.");
     } else {
       toast.error("Could not log out. Please try again.");
     }
-    window.setTimeout(() => {
-      router.push("/admin/login");
-      router.refresh();
-    }, 200);
+
+    const elapsedMs = Date.now() - logoutStartedAt;
+    const remainingMs = Math.max(0, LOGOUT_DIALOG_MIN_MS - elapsedMs);
+    if (remainingMs > 0) {
+      await new Promise((resolve) => window.setTimeout(resolve, remainingMs));
+    }
+
+    router.push("/admin/login");
+    router.refresh();
   }
 
   useEffect(() => {
@@ -127,6 +145,11 @@ export function AdminDashboard() {
         open={isLoading}
         title="Loading requests"
         description="Fetching pending registrations…"
+      />
+      <AdminLoadingDialog
+        open={isLoggingOut}
+        title="Signing out"
+        description="Closing your admin session…"
       />
       <Card className="overflow-hidden py-0">
         <CardHeader className="px-4 pt-5 sm:px-6 sm:pt-6">

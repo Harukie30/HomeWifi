@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { rejectRequest } from "@/lib/mock-store";
+import { isValidUuid } from "@/lib/validation";
 
 export async function POST(
   _request: Request,
@@ -11,6 +12,9 @@ export async function POST(
   }
 
   const { id } = await context.params;
+  if (!isValidUuid(id)) {
+    return NextResponse.json({ error: "Invalid request id." }, { status: 400 });
+  }
   const updated = await rejectRequest(id);
 
   if (!updated) {

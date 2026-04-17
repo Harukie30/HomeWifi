@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 
 import {
   ADMIN_SESSION_COOKIE,
-  ADMIN_SESSION_VALUE,
+  getAdminSessionValue,
 } from "@/lib/admin-session";
 
 function isPublicAdminRoute(pathname: string) {
@@ -17,7 +17,9 @@ function isPublicAdminRoute(pathname: string) {
 }
 
 function hasAdminSession(request: NextRequest) {
-  return request.cookies.get(ADMIN_SESSION_COOKIE)?.value === ADMIN_SESSION_VALUE;
+  return (
+    request.cookies.get(ADMIN_SESSION_COOKIE)?.value === getAdminSessionValue()
+  );
 }
 
 export function middleware(request: NextRequest) {

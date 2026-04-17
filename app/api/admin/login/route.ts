@@ -1,28 +1,34 @@
 import { NextResponse } from "next/server";
-import { setAdminSessionCookie } from "@/lib/admin-auth";
-
-type LoginPayload = {
-  email?: string;
-  password?: string;
-};
+import {
+  setAdminSessionCookie,
+  verifyAdminCredentials,
+} from "@/lib/admin-auth";
+import { validateAdminLoginPayload } from "@/lib/validation";
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as LoginPayload;
+  let payload: unknown;
+  try {
+    payload = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
 
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  const validation = validateAdminLoginPayload(payload);
+  if (!validation.ok) {
+    return NextResponse.json({ error: validation.message }, { status: 400 });
+  }
 
-  if (!adminEmail || !adminPassword) {
+  const { email, password } = validation.data;
+  const result = await verifyAdminCredentials(email, password);
+
+  if (result.reason === "misconfigured") {
     return NextResponse.json(
-      { error: "Admin credentials are not configured on the server." },
+      { error: "Admin auth is not configured on the server." },
       { status: 500 }
     );
   }
 
-  const isValid =
-    payload.email?.trim() === adminEmail && payload.password === adminPassword;
-
-  if (!isValid) {
+  if (!result.ok) {
     return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
   }
 

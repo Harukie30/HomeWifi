@@ -243,28 +243,28 @@ export function AdminOverviewPage() {
               {cards.map((card) => (
                 <Card
                   key={card.title}
-                  className="border-blue-200/70 bg-white/85 py-0 shadow-sm shadow-blue-900/5 backdrop-blur-sm dark:border-blue-900/45 dark:bg-zinc-900/75 dark:shadow-blue-950/20"
+                  className="flex h-full min-h-[188px] flex-col border-blue-200/70 bg-white/85 py-0 shadow-sm shadow-blue-900/5 backdrop-blur-sm dark:border-blue-900/45 dark:bg-zinc-900/75 dark:shadow-blue-950/20"
                 >
-                  <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-2 pt-4 sm:pt-5">
-                    <div className="min-w-0 space-y-1">
-                      <CardTitle className="text-base font-semibold">
+                  <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <CardTitle className="text-[15px] font-semibold leading-tight tracking-tight text-zinc-900 dark:text-zinc-50">
                         {card.title}
                       </CardTitle>
-                      <CardDescription className="text-xs leading-snug">
+                      <CardDescription className="line-clamp-2 text-[12px] leading-relaxed text-zinc-500 dark:text-zinc-400">
                         {card.description}
                       </CardDescription>
                     </div>
                     <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${card.accent}`}
+                      className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${card.accent}`}
                     >
                       <card.icon className="size-5" aria-hidden />
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-2 pb-5 pt-0">
-                    <p className="text-3xl font-semibold tabular-nums tracking-tight text-zinc-900 dark:text-zinc-50">
+                  <CardContent className="mt-auto space-y-1.5 px-4 pb-5 pt-1 sm:px-5">
+                    <p className="text-3xl font-semibold tabular-nums leading-none tracking-tight text-zinc-900 dark:text-zinc-50">
                       {card.value}
                     </p>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    <p className="text-xs font-medium leading-snug text-zinc-500 dark:text-zinc-400">
                       {card.footnote}
                     </p>
                   </CardContent>

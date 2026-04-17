@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { isAdminAuthenticated } from "@/lib/admin-auth";
 import { removeResident } from "@/lib/mock-store";
+import { isValidUuid } from "@/lib/validation";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -11,6 +12,9 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
+  if (!isValidUuid(id)) {
+    return NextResponse.json({ error: "Invalid resident id." }, { status: 400 });
+  }
   const ok = await removeResident(id);
 
   if (!ok) {

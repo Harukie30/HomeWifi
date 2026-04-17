@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { RegistrationRequest, Resident, RequestStatus } from "@/lib/models";
 
+type TransactionClient = Parameters<
+  Extract<Parameters<typeof prisma.$transaction>[0], (arg: unknown) => unknown>
+>[0];
+
 function formatAdded(d: Date): string {
   return d.toLocaleDateString("en-US", {
     month: "short",
@@ -87,7 +91,7 @@ export async function createRegistrationRequest(
 export async function approveRequest(
   requestId: string
 ): Promise<RegistrationRequest | null> {
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx: TransactionClient) => {
     const request = await tx.registrationRequest.findFirst({
       where: { id: requestId, status: "pending" },
     });
@@ -130,5 +134,23 @@ export async function rejectRequest(
     where: { id: requestId },
     data: { status: "rejected" },
   });
+  return toRegistrationRequest(row);
+}
+
+export async function getLatestRegistrationByIdentity(
+  name: string,
+  phone: string
+): Promise<RegistrationRequest | null> {
+  const row = await prisma.registrationRequest.findFirst({
+    where: {
+      name: {
+        equals: name.trim(),
+        mode: "insensitive",
+      },
+      phone: phone.trim(),
+    },
+    orderBy: { submittedAt: "desc" },
+  });
+  if (!row) return null;
   return toRegistrationRequest(row);
 }

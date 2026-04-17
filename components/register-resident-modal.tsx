@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,8 @@ import {
 } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
+import { cn } from "@/lib/utils";
+
 export type RegisterResidentFormData = {
   name: string;
   unit: string;
@@ -44,6 +47,11 @@ type RegisterResidentModalProps = {
 
 const unitOptions = ["1", "2", "3", "4", "5"];
 
+/** Philippine mobile: 11 digits, starts with 09 */
+function isValidPhilippineMobile(phone: string): boolean {
+  return /^09\d{9}$/.test(phone);
+}
+
 export function RegisterResidentModal({
   open,
   onClose,
@@ -51,6 +59,8 @@ export function RegisterResidentModal({
 }: RegisterResidentModalProps) {
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+  const [isTermsProcessing, setIsTermsProcessing] = useState(false);
+  const [isTermsAcceptingSuccess, setIsTermsAcceptingSuccess] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,10 +91,14 @@ export function RegisterResidentModal({
 
     if (!form.name.trim()) nextErrors.name = "Name is required.";
     if (!form.unit.trim()) nextErrors.unit = "Unit is required.";
-    if (!form.phone.trim()) {
+    const phoneDigits = form.phone.trim();
+    if (!phoneDigits) {
       nextErrors.phone = "Phone number is required.";
-    } else if (form.phone.length !== 11) {
+    } else if (phoneDigits.length !== 11) {
       nextErrors.phone = "Phone number must be exactly 11 digits.";
+    } else if (!isValidPhilippineMobile(phoneDigits)) {
+      nextErrors.phone =
+        "Use a Philippine mobile number starting with 09 (e.g. 09XXXXXXXXX).";
     }
     if (!form.phoneModel.trim()) {
       nextErrors.phoneModel = "Phone model is required.";
@@ -244,6 +258,13 @@ export function RegisterResidentModal({
                 >
                   Phone number
                 </Label>
+                <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+                  Philippine mobile only — 11 digits starting with{" "}
+                  <span className="font-mono text-zinc-600 dark:text-zinc-300">
+                    09
+                  </span>
+                  .
+                </p>
                 <Input
                   id="resident-phone"
                   value={form.phone}
@@ -255,20 +276,48 @@ export function RegisterResidentModal({
                       ...current,
                       phone: sanitizedPhone,
                     }));
-                    if (sanitizedPhone.length === 0 || sanitizedPhone.length === 11) {
+                    if (sanitizedPhone.length === 0) {
+                      setPhoneError("");
+                    } else if (
+                      sanitizedPhone.length >= 2 &&
+                      !sanitizedPhone.startsWith("09")
+                    ) {
+                      setPhoneError(
+                        "Phone number must start with 09."
+                      );
+                    } else if (
+                      sanitizedPhone.length === 11 &&
+                      !isValidPhilippineMobile(sanitizedPhone)
+                    ) {
+                      setPhoneError(
+                        "Use a Philippine mobile number starting with 09."
+                      );
+                    } else {
                       setPhoneError("");
                     }
                     setFormErrors((current) => ({ ...current, phone: undefined }));
                   }}
                   onBlur={() => {
-                    if (form.phone.length > 0 && form.phone.length !== 11) {
-                      setPhoneError("Phone number must be exactly 11 digits.");
-                    } else {
+                    const p = form.phone;
+                    if (p.length === 0) {
                       setPhoneError("");
+                      return;
                     }
+                    if (p.length !== 11) {
+                      setPhoneError("Phone number must be exactly 11 digits.");
+                      return;
+                    }
+                    if (!isValidPhilippineMobile(p)) {
+                      setPhoneError(
+                        "Use a Philippine mobile number starting with 09 (e.g. 09XXXXXXXXX)."
+                      );
+                      return;
+                    }
+                    setPhoneError("");
                   }}
                   inputMode="numeric"
-                  pattern="\d{11}"
+                  pattern="09[0-9]{9}"
+                  autoComplete="tel-national"
                   maxLength={11}
                   placeholder="09XXXXXXXXX"
                   aria-invalid={phoneError ? "true" : "false"}
@@ -315,16 +364,16 @@ export function RegisterResidentModal({
 
             <div className="flex items-center justify-end gap-2 border-t border-zinc-200 pt-4 dark:border-zinc-800">
               <div className="mr-auto space-y-1">
-                <p className="inline-flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-300">
-                  Please review and accept the
+                <p className="max-w-[min(100%,20rem)] text-pretty  text-md leading-relaxed text-zinc-600 dark:text-zinc-300">
+                  Please review and accept the{" "}
                   <button
                     type="button"
-                    className="font-medium text-amber-700 underline underline-offset-2 dark:text-amber-400"
+                    className="inline font-medium text-amber-700 underline cursor-pointer underline-offset-[3px] decoration-amber-600/40 transition-colors hover:text-amber-800 dark:text-amber-400 dark:decoration-amber-500/40 dark:hover:text-amber-300"
                     onClick={() => setIsTermsModalOpen(true)}
                   >
-                    Terms & Agreement
-                  </button>
-                  .
+                    {"Terms & Agreement"}
+                  </button>{" "}
+                  before registering.
                 </p>
                 {formErrors.terms ? (
                   <p className="text-xs text-red-600 dark:text-red-400">
@@ -367,7 +416,10 @@ export function RegisterResidentModal({
       {isTermsModalOpen ? (
         <div
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
-          onClick={() => setIsTermsModalOpen(false)}
+          onClick={() => {
+            if (isTermsAcceptingSuccess || isTermsProcessing) return;
+            setIsTermsModalOpen(false);
+          }}
         >
           <Card
             className="w-full max-w-md border-zinc-200 bg-white py-0 dark:border-zinc-800 dark:bg-zinc-900"
@@ -380,34 +432,91 @@ export function RegisterResidentModal({
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 px-5 pb-5 text-sm text-zinc-700 dark:text-zinc-300">
-              <p>
-                By registering, you confirm the details you provided are correct
-                and authorize Abella Home admin to review your request.
-              </p>
-              <p>
-                WiFi access is for authorized resident use only and may be
-                suspended if policy violations are found.
-              </p>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsTermsModalOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button
-                  type="button"
-                  className="bg-amber-500 text-black hover:bg-amber-600 hover:text-white"
-                  onClick={() => {
-                    setHasAcceptedTerms(true);
-                    setFormErrors((current) => ({ ...current, terms: undefined }));
-                    setIsTermsModalOpen(false);
-                  }}
-                >
-                  Accept
-                </Button>
-              </div>
+              {isTermsProcessing ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                  <div className="rounded-full border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800/70">
+                    <Spinner className="size-6 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <p className="mt-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                    Saving your agreement
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Please wait for a moment...
+                  </p>
+                </div>
+              ) : isTermsAcceptingSuccess ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                  <div className="relative">
+                    <span
+                      className="absolute inset-0 rounded-full bg-emerald-500/25 animate-ping"
+                      aria-hidden
+                    />
+                    <CheckCircle2
+                      className="relative size-11 text-emerald-600 dark:text-emerald-400"
+                      aria-hidden
+                    />
+                  </div>
+                  <p className="mt-3 text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                    Agreement accepted
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    You can now submit your registration.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p>
+                    By registering, you confirm the details you provided are
+                    correct and authorize Abella Home admin to review your
+                    request.
+                  </p>
+                  <p>
+                    WiFi access is for authorized resident use only and may be
+                    suspended if policy violations are found.
+                  </p>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="bg-blue-500 text-white cursor-pointer hover:bg-blue-600 hover:text-white"
+                      disabled={isTermsAcceptingSuccess || isTermsProcessing}
+                      onClick={() => {
+                        setHasAcceptedTerms(false);
+                        setFormErrors((current) => ({
+                          ...current,
+                          terms: "You must accept the Terms & Agreement.",
+                        }));
+                        setIsTermsModalOpen(false);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-amber-500 text-black cursor-pointer hover:bg-amber-600 hover:text-white"
+                      disabled={isTermsAcceptingSuccess || isTermsProcessing}
+                      onClick={() => {
+                        setIsTermsProcessing(true);
+                        window.setTimeout(() => {
+                          setIsTermsProcessing(false);
+                          setHasAcceptedTerms(true);
+                          setFormErrors((current) => ({
+                            ...current,
+                            terms: undefined,
+                          }));
+                          setIsTermsAcceptingSuccess(true);
+                          window.setTimeout(() => {
+                            setIsTermsAcceptingSuccess(false);
+                            setIsTermsModalOpen(false);
+                          }, 900);
+                        }, 2500);
+                      }}
+                    >
+                      Accept
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
