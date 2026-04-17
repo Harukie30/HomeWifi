@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
+import { AdminLoadingDialog } from "@/components/admin/admin-loading-dialog";
 import { RejectedRegistrationsTable } from "@/components/admin/rejected-registrations-table";
 import type { RegistrationRequest } from "@/lib/models";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ export function AdminRejectedPage() {
     const response = await fetch("/api/admin/requests", { cache: "no-store" });
 
     if (response.status === 401) {
+      setIsLoading(false);
       router.push("/admin/login");
       return;
     }
@@ -59,6 +61,11 @@ export function AdminRejectedPage() {
 
   return (
     <AdminDashboardShell title="Rejected users" onLogout={handleLogout}>
+      <AdminLoadingDialog
+        open={isLoading}
+        title="Loading registrations"
+        description="Fetching rejected requests…"
+      />
       <RejectedRegistrationsTable
         requests={rejectedRequests}
         isLoading={isLoading}

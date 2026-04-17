@@ -1,17 +1,22 @@
 import { cookies } from "next/headers";
 
-export const ADMIN_SESSION_COOKIE = "admin_session";
+import {
+  ADMIN_SESSION_COOKIE,
+  ADMIN_SESSION_VALUE,
+} from "@/lib/admin-session";
+
+export { ADMIN_SESSION_COOKIE } from "@/lib/admin-session";
 
 const ONE_DAY = 60 * 60 * 24;
 
 export async function isAdminAuthenticated(): Promise<boolean> {
   const cookieStore = await cookies();
-  return cookieStore.get(ADMIN_SESSION_COOKIE)?.value === "authenticated";
+  return cookieStore.get(ADMIN_SESSION_COOKIE)?.value === ADMIN_SESSION_VALUE;
 }
 
 export async function setAdminSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, "authenticated", {
+  cookieStore.set(ADMIN_SESSION_COOKIE, ADMIN_SESSION_VALUE, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

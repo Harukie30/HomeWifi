@@ -41,31 +41,33 @@ export function AdminDashboardShell({
   onLogout: () => void;
 }) {
   const pathname = usePathname();
-  const isPendingActive =
+  const isOverviewActive =
     pathname === "/admin" || pathname === "/admin/";
+  const isPendingActive = pathname.startsWith("/admin/pending");
   const isRejectedActive = pathname.startsWith("/admin/rejected");
+  const isWifiUsersActive = pathname.startsWith("/admin/wifi-users");
 
   const surfaceCard =
     "rounded-2xl border border-blue-200/80 bg-white/75 shadow-sm shadow-blue-900/5 backdrop-blur-md dark:border-blue-900/45 dark:bg-zinc-900/65 dark:shadow-blue-950/20";
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-zinc-100 dark:bg-zinc-950">
+    <div className="relative flex min-h-screen min-h-[100dvh] flex-col overflow-x-hidden bg-zinc-100 dark:bg-zinc-950">
       <AdminDashboardBackdrop />
       <div className="relative z-10 flex min-h-screen flex-1 flex-col">
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
+        <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-6 sm:px-4 sm:py-8 md:px-6 md:py-10">
           {/* Top bar */}
           <header
             className={cn(
-              "mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-start sm:justify-between",
+              "mb-5 flex flex-col gap-3 sm:mb-7 sm:gap-4 md:mb-8 sm:flex-row sm:items-start sm:justify-between",
               surfaceCard,
-              "p-5 sm:p-6"
+              "p-4 sm:p-5 md:p-6"
             )}
           >
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-blue-600/90 dark:text-blue-400/90">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-blue-600/90 sm:text-sm dark:text-blue-400/90">
                 {subtitle ?? "Admin Dashboard"}
               </p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-3xl">
+              <h1 className="mt-1 break-words text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-2xl md:text-3xl">
                 {title}
               </h1>
             </div>
@@ -73,7 +75,7 @@ export function AdminDashboardShell({
               type="button"
               variant="outline"
               className={cn(
-                "shrink-0 cursor-pointer border-red-400 bg-red-600 text-white shadow-sm",
+                "w-full cursor-pointer border-red-400 bg-red-600 text-white shadow-sm sm:w-auto sm:shrink-0",
                 "hover:bg-red-700 hover:text-white",
                 "dark:border-red-800 dark:bg-red-600 dark:hover:bg-red-700"
               )}
@@ -85,33 +87,57 @@ export function AdminDashboardShell({
 
           {/* Mobile tab bar */}
           <nav
-            className={cn("mb-6 lg:hidden", surfaceCard, "p-2")}
+            className={cn("mb-5 sm:mb-6 lg:hidden", surfaceCard, "p-1.5 sm:p-2")}
             aria-label="Admin sections"
           >
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-1 sm:gap-1.5 sm:grid-cols-4">
+              <Button
+                variant={isOverviewActive ? "secondary" : "outline"}
+                size="sm"
+                className={cn(
+                  "min-h-[2.5rem] min-w-0 border-blue-200/70 px-1.5 text-[11px] leading-tight sm:px-2 sm:text-xs dark:border-blue-800/60",
+                  !isOverviewActive &&
+                    "bg-white/60 text-blue-900 hover:bg-blue-50/80 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-blue-950/40"
+                )}
+                asChild
+              >
+                <Link href="/admin">Overview</Link>
+              </Button>
               <Button
                 variant={isPendingActive ? "secondary" : "outline"}
                 size="sm"
                 className={cn(
-                  "flex-1 border-blue-200/70 dark:border-blue-800/60",
+                  "min-h-[2.5rem] min-w-0 border-blue-200/70 px-1.5 text-[11px] leading-tight sm:px-2 sm:text-xs dark:border-blue-800/60",
                   !isPendingActive &&
                     "bg-white/60 text-blue-900 hover:bg-blue-50/80 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-blue-950/40"
                 )}
                 asChild
               >
-                <Link href="/admin">Pending</Link>
+                <Link href="/admin/pending">Pending</Link>
               </Button>
               <Button
                 variant={isRejectedActive ? "secondary" : "outline"}
                 size="sm"
                 className={cn(
-                  "flex-1 border-blue-200/70 dark:border-blue-800/60",
+                  "min-h-[2.5rem] min-w-0 border-blue-200/70 px-1.5 text-[11px] leading-tight sm:px-2 sm:text-xs dark:border-blue-800/60",
                   !isRejectedActive &&
                     "bg-white/60 text-blue-900 hover:bg-blue-50/80 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-blue-950/40"
                 )}
                 asChild
               >
                 <Link href="/admin/rejected">Rejected</Link>
+              </Button>
+              <Button
+                variant={isWifiUsersActive ? "secondary" : "outline"}
+                size="sm"
+                className={cn(
+                  "min-h-[2.5rem] min-w-0 border-blue-200/70 px-1.5 text-[11px] leading-tight sm:px-2 sm:text-xs dark:border-blue-800/60",
+                  !isWifiUsersActive &&
+                    "bg-white/60 text-blue-900 hover:bg-blue-50/80 dark:bg-zinc-900/50 dark:text-zinc-200 dark:hover:bg-blue-950/40"
+                )}
+                asChild
+              >
+                <Link href="/admin/wifi-users">WiFi users</Link>
               </Button>
             </div>
           </nav>
@@ -131,6 +157,19 @@ export function AdminDashboardShell({
               </p>
               <nav className="mt-4 space-y-1.5">
                 <Button
+                  variant={isOverviewActive ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "w-full justify-start",
+                    !isOverviewActive && "font-normal text-zinc-700 hover:bg-blue-50/90 dark:text-zinc-300 dark:hover:bg-blue-950/35",
+                    isOverviewActive &&
+                      "bg-blue-100/90 text-blue-950 dark:bg-blue-950/50 dark:text-blue-50"
+                  )}
+                  asChild
+                >
+                  <Link href="/admin">Overview</Link>
+                </Button>
+                <Button
                   variant={isPendingActive ? "secondary" : "ghost"}
                   size="sm"
                   className={cn(
@@ -141,7 +180,7 @@ export function AdminDashboardShell({
                   )}
                   asChild
                 >
-                  <Link href="/admin">Pending requests</Link>
+                  <Link href="/admin/pending">Pending requests</Link>
                 </Button>
                 <Button
                   variant={isRejectedActive ? "secondary" : "ghost"}
@@ -156,6 +195,19 @@ export function AdminDashboardShell({
                 >
                   <Link href="/admin/rejected">Rejected users</Link>
                 </Button>
+                <Button
+                  variant={isWifiUsersActive ? "secondary" : "ghost"}
+                  size="sm"
+                  className={cn(
+                    "w-full justify-start",
+                    !isWifiUsersActive && "font-normal text-zinc-700 hover:bg-blue-50/90 dark:text-zinc-300 dark:hover:bg-blue-950/35",
+                    isWifiUsersActive &&
+                      "bg-blue-100/90 text-blue-950 dark:bg-blue-950/50 dark:text-blue-50"
+                  )}
+                  asChild
+                >
+                  <Link href="/admin/wifi-users">WiFi users</Link>
+                </Button>
               </nav>
             </aside>
 
@@ -164,7 +216,7 @@ export function AdminDashboardShell({
         </main>
 
         <footer className="relative z-10 mt-auto border-t border-blue-200/60 bg-white/55 backdrop-blur-md dark:border-blue-950/80 dark:bg-zinc-950/70">
-          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-5 sm:flex-row sm:px-6">
+          <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-3 py-4 sm:flex-row sm:px-4 sm:py-5 md:px-6">
             <p className="text-center text-xs text-blue-900/70 dark:text-blue-300/70">
               Abella Home WiFi — Admin portal
             </p>

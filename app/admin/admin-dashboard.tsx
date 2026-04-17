@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/table";
 import type { RegistrationRequest } from "@/lib/models";
 import { AdminDashboardShell } from "@/components/admin/admin-dashboard-shell";
+import { AdminLoadingDialog } from "@/components/admin/admin-loading-dialog";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
 export function AdminDashboard() {
@@ -34,6 +36,7 @@ export function AdminDashboard() {
     const response = await fetch("/api/admin/requests", { cache: "no-store" });
 
     if (response.status === 401) {
+      setIsLoading(false);
       router.push("/admin/login");
       return;
     }
@@ -77,46 +80,77 @@ export function AdminDashboard() {
 
   return (
     <AdminDashboardShell title="Pending requests" onLogout={handleLogout}>
-      <Card className="py-0">
-        <CardHeader className="px-6 pt-6">
-          <CardTitle>Pending requests</CardTitle>
+      <AdminLoadingDialog
+        open={isLoading}
+        title="Loading requests"
+        description="Fetching pending registrations…"
+      />
+      <Card className="overflow-hidden py-0">
+        <CardHeader className="px-4 pt-5 sm:px-6 sm:pt-6">
+          <CardTitle className="text-lg sm:text-xl">Pending requests</CardTitle>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <Table>
+          <div className="overflow-x-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+            <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
-                <TableHead className="px-6">Name</TableHead>
+                <TableHead className="px-4 sm:px-6">Name</TableHead>
                 <TableHead>Unit</TableHead>
                 <TableHead>Phone</TableHead>
                 <TableHead>Phone Model</TableHead>
                 <TableHead>Submitted</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right pr-6">Actions</TableHead>
+                <TableHead className="text-right pr-4 sm:pr-6">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="px-6 py-8 text-center">
-                    Loading requests...
-                  </TableCell>
-                </TableRow>
+                Array.from({ length: 6 }).map((_, row) => (
+                  <TableRow key={row}>
+                    <TableCell className="px-4 sm:px-6">
+                      <Skeleton className="h-4 w-28" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-28" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-36" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </TableCell>
+                    <TableCell className="pr-4 sm:pr-6">
+                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
+                        <Skeleton className="h-8 w-20 rounded-md sm:h-7" />
+                        <Skeleton className="h-8 w-20 rounded-md sm:h-7" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="px-6 py-8 text-center text-red-600">
+                  <TableCell colSpan={7} className="px-4 py-8 text-center text-red-600 sm:px-6">
                     {error}
                   </TableCell>
                 </TableRow>
               ) : pendingRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="px-6 py-8 text-center text-zinc-500">
+                  <TableCell colSpan={7} className="px-4 py-8 text-center text-zinc-500 sm:px-6">
                     No pending requests right now.
                   </TableCell>
                 </TableRow>
               ) : (
                 pendingRequests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell className="px-6 font-medium">{request.name}</TableCell>
+                    <TableCell className="max-w-[140px] px-4 font-medium sm:max-w-none sm:px-6">
+                      <span className="line-clamp-2 sm:line-clamp-none">{request.name}</span>
+                    </TableCell>
                     <TableCell>{request.unit}</TableCell>
                     <TableCell>{request.phone}</TableCell>
                     <TableCell>{request.phoneModel}</TableCell>
@@ -126,11 +160,11 @@ export function AdminDashboard() {
                     <TableCell>
                       <Badge variant="outline">Pending</Badge>
                     </TableCell>
-                    <TableCell className="pr-6 text-right">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="pr-4 text-right sm:pr-6">
+                      <div className="flex flex-col items-end gap-2 sm:flex-row sm:justify-end">
                         <Button
                           size="sm"
-                          className="bg-emerald-600 text-white hover:bg-emerald-700"
+                          className="w-full min-w-[5.5rem] bg-emerald-600 text-white hover:bg-emerald-700 sm:w-auto"
                           onClick={() => handleAction(request.id, "approve")}
                         >
                           Approve
@@ -138,7 +172,7 @@ export function AdminDashboard() {
                         <Button
                           size="sm"
                           variant="outline"
-                          className="border-red-300 text-red-600 hover:bg-red-50"
+                          className="w-full min-w-[5.5rem] border-red-300 text-red-600 hover:bg-red-50 sm:w-auto"
                           onClick={() => handleAction(request.id, "reject")}
                         >
                           Reject
@@ -150,6 +184,7 @@ export function AdminDashboard() {
               )}
             </TableBody>
           </Table>
+          </div>
         </CardContent>
       </Card>
     </AdminDashboardShell>

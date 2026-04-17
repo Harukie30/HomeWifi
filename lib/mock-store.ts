@@ -8,6 +8,15 @@ export function getResidents(): Resident[] {
   return [...residentsStore];
 }
 
+export function removeResident(residentId: string): boolean {
+  const index = residentsStore.findIndex((r) => r.id === residentId);
+  if (index === -1) {
+    return false;
+  }
+  residentsStore.splice(index, 1);
+  return true;
+}
+
 export function getRegistrationRequests(status?: RequestStatus): RegistrationRequest[] {
   if (!status) {
     return [...registrationRequestsStore];

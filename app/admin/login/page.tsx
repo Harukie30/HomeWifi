@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,8 +10,20 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-export default function AdminLoginPage() {
+function safeAdminRedirect(path: string | null): string {
+  if (
+    path &&
+    path.startsWith("/admin") &&
+    !path.startsWith("/admin/login")
+  ) {
+    return path;
+  }
+  return "/admin";
+}
+
+function AdminLoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -61,8 +73,9 @@ export default function AdminLoginPage() {
 
     setLoginProgress(100);
     toast.success("Signed in successfully.");
+    const nextPath = safeAdminRedirect(searchParams.get("redirect"));
     window.setTimeout(() => {
-      router.push("/admin");
+      router.push(nextPath);
       router.refresh();
     }, 200);
   }
@@ -183,5 +196,19 @@ export default function AdminLoginPage() {
         </div>
       ) : null}
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-zinc-100 dark:bg-zinc-950">
+          <p className="text-sm text-zinc-500">Loading…</p>
+        </div>
+      }
+    >
+      <AdminLoginForm />
+    </Suspense>
   );
 }

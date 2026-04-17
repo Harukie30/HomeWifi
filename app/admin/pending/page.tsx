@@ -1,11 +1,11 @@
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { AdminOverviewPage } from "@/components/admin/admin-overview-page";
+import { AdminDashboard } from "@/app/admin/admin-dashboard";
 import { LoginRedirectLoading } from "@/app/admin/login-redirect-loading";
 
-export default async function AdminPage() {
+export default async function AdminPendingPage() {
   if (!(await isAdminAuthenticated())) {
     return <LoginRedirectLoading />;
   }
 
-  return <AdminOverviewPage />;
+  return <AdminDashboard />;
 }
