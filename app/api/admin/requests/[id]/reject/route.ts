@@ -11,7 +11,7 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const updated = rejectRequest(id);
+  const updated = await rejectRequest(id);
 
   if (!updated) {
     return NextResponse.json(

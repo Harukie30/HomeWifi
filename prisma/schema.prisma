@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model RegistrationRequest {
+  id          String   @id @default(uuid())
+  name        String
+  unit        String
+  phone       String
+  phoneModel  String
+  submittedAt DateTime @default(now())
+  status      String
+
+  @@index([status])
+}
+
+model Resident {
+  id      String   @id @default(uuid())
+  name    String
+  unit    String
+  status  String   @default("Active")
+  addedAt DateTime @default(now())
+
+  @@index([unit])
+}

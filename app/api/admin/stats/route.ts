@@ -8,8 +8,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const requests = getRegistrationRequests();
-  const residents = getResidents();
+  const requests = await getRegistrationRequests();
+  const residents = await getResidents();
 
   const pending = requests.filter((r) => r.status === "pending").length;
   const rejected = requests.filter((r) => r.status === "rejected").length;

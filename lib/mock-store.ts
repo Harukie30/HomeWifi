@@ -1,71 +1,134 @@
-import { mockResidents } from "@/lib/mock-users";
+import { prisma } from "@/lib/prisma";
 import type { RegistrationRequest, Resident, RequestStatus } from "@/lib/models";
 
-const residentsStore: Resident[] = [...mockResidents];
-const registrationRequestsStore: RegistrationRequest[] = [];
-
-export function getResidents(): Resident[] {
-  return [...residentsStore];
+function formatAdded(d: Date): string {
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-export function removeResident(residentId: string): boolean {
-  const index = residentsStore.findIndex((r) => r.id === residentId);
-  if (index === -1) {
+function toResident(row: {
+  id: string;
+  name: string;
+  unit: string;
+  status: string;
+  addedAt: Date;
+}): Resident {
+  return {
+    id: row.id,
+    name: row.name,
+    unit: row.unit,
+    status: row.status as Resident["status"],
+    added: formatAdded(row.addedAt),
+  };
+}
+
+function toRegistrationRequest(row: {
+  id: string;
+  name: string;
+  unit: string;
+  phone: string;
+  phoneModel: string;
+  submittedAt: Date;
+  status: string;
+}): RegistrationRequest {
+  return {
+    id: row.id,
+    name: row.name,
+    unit: row.unit,
+    phone: row.phone,
+    phoneModel: row.phoneModel,
+    submittedAt: row.submittedAt.toISOString(),
+    status: row.status as RequestStatus,
+  };
+}
+
+export async function getResidents(): Promise<Resident[]> {
+  const rows = await prisma.resident.findMany({ orderBy: { addedAt: "desc" } });
+  return rows.map(toResident);
+}
+
+export async function removeResident(residentId: string): Promise<boolean> {
+  try {
+    const result = await prisma.resident.delete({ where: { id: residentId } });
+    return !!result;
+  } catch {
     return false;
   }
-  residentsStore.splice(index, 1);
-  return true;
 }
 
-export function getRegistrationRequests(status?: RequestStatus): RegistrationRequest[] {
-  if (!status) {
-    return [...registrationRequestsStore];
-  }
-  return registrationRequestsStore.filter((request) => request.status === status);
+export async function getRegistrationRequests(
+  status?: RequestStatus
+): Promise<RegistrationRequest[]> {
+  const rows = await prisma.registrationRequest.findMany({
+    where: status ? { status } : undefined,
+    orderBy: { submittedAt: "desc" },
+  });
+  return rows.map(toRegistrationRequest);
 }
 
-export function createRegistrationRequest(
+export async function createRegistrationRequest(
   payload: Omit<RegistrationRequest, "id" | "submittedAt" | "status">
-): RegistrationRequest {
-  const request: RegistrationRequest = {
-    id: crypto.randomUUID(),
-    submittedAt: new Date().toISOString(),
-    status: "pending",
-    ...payload,
-  };
-
-  registrationRequestsStore.unshift(request);
-  return request;
+): Promise<RegistrationRequest> {
+  const row = await prisma.registrationRequest.create({
+    data: {
+      name: payload.name,
+      unit: payload.unit,
+      phone: payload.phone,
+      phoneModel: payload.phoneModel,
+      status: "pending",
+    },
+  });
+  return toRegistrationRequest(row);
 }
 
-export function approveRequest(requestId: string): RegistrationRequest | null {
-  const request = registrationRequestsStore.find((item) => item.id === requestId);
-  if (!request || request.status !== "pending") {
-    return null;
-  }
+export async function approveRequest(
+  requestId: string
+): Promise<RegistrationRequest | null> {
+  const result = await prisma.$transaction(async (tx) => {
+    const request = await tx.registrationRequest.findFirst({
+      where: { id: requestId, status: "pending" },
+    });
+    if (!request) {
+      return null;
+    }
 
-  request.status = "approved";
-  residentsStore.unshift({
-    id: crypto.randomUUID(),
-    name: request.name,
-    unit: request.unit,
-    status: "Active",
-    added: new Date().toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }),
+    await tx.registrationRequest.update({
+      where: { id: requestId },
+      data: { status: "approved" },
+    });
+
+    await tx.resident.create({
+      data: {
+        name: request.name,
+        unit: request.unit,
+        status: "Active",
+      },
+    });
+
+    return tx.registrationRequest.findUniqueOrThrow({ where: { id: requestId } });
   });
 
-  return request;
-}
-
-export function rejectRequest(requestId: string): RegistrationRequest | null {
-  const request = registrationRequestsStore.find((item) => item.id === requestId);
-  if (!request || request.status !== "pending") {
+  if (!result) {
     return null;
   }
+  return toRegistrationRequest(result);
+}
 
-  request.status = "rejected";
-  return request;
+export async function rejectRequest(
+  requestId: string
+): Promise<RegistrationRequest | null> {
+  const pending = await prisma.registrationRequest.findFirst({
+    where: { id: requestId, status: "pending" },
+  });
+  if (!pending) {
+    return null;
+  }
+  const row = await prisma.registrationRequest.update({
+    where: { id: requestId },
+    data: { status: "rejected" },
+  });
+  return toRegistrationRequest(row);
 }

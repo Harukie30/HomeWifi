@@ -11,7 +11,7 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const { id } = await context.params;
-  const ok = removeResident(id);
+  const ok = await removeResident(id);
 
   if (!ok) {
     return NextResponse.json({ error: "Resident not found." }, { status: 404 });

@@ -30,35 +30,78 @@ export function AdminDashboard() {
     [requests]
   );
 
-  async function loadRequests() {
-    setIsLoading(true);
+  async function loadRequests(options?: { silent?: boolean }) {
+    const silent = options?.silent ?? false;
+    if (!silent) {
+      setIsLoading(true);
+    }
     setError("");
-    const response = await fetch("/api/admin/requests", { cache: "no-store" });
+    try {
+      const response = await fetch("/api/admin/requests", { cache: "no-store" });
 
-    if (response.status === 401) {
-      setIsLoading(false);
-      router.push("/admin/login");
-      return;
+      if (response.status === 401) {
+        router.push("/admin/login");
+        return;
+      }
+
+      if (!response.ok) {
+        setError("Failed to load registration requests.");
+        toast.error("Could not load requests.");
+        return;
+      }
+
+      const payload = (await response.json()) as {
+        requests: RegistrationRequest[];
+      };
+      setRequests(payload.requests);
+    } finally {
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
-
-    if (!response.ok) {
-      setError("Failed to load registration requests.");
-      setIsLoading(false);
-      return;
-    }
-
-    const payload = (await response.json()) as { requests: RegistrationRequest[] };
-    setRequests(payload.requests);
-    setIsLoading(false);
   }
 
   async function handleAction(requestId: string, action: "approve" | "reject") {
-    const response = await fetch(`/api/admin/requests/${requestId}/${action}`, {
-      method: "POST",
-    });
-    if (response.ok) {
-      loadRequests();
-    }
+    const row = pendingRequests.find((r) => r.id === requestId);
+    const who = row ? `${row.name} · Unit ${row.unit}` : "This request";
+
+    await toast.promise(
+      (async () => {
+        const response = await fetch(
+          `/api/admin/requests/${requestId}/${action}`,
+          { method: "POST" }
+        );
+
+        if (response.status === 401) {
+          router.push("/admin/login");
+          throw new Error("Session expired. Please sign in again.");
+        }
+
+        if (!response.ok) {
+          const body = (await response.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          throw new Error(
+            body.error ??
+              (action === "approve"
+                ? "Could not approve this request."
+                : "Could not reject this request.")
+          );
+        }
+
+        await loadRequests({ silent: true });
+      })(),
+      {
+        loading:
+          action === "approve" ? "Approving registration…" : "Rejecting request…",
+        success:
+          action === "approve"
+            ? `Approved — ${who} now has WiFi access.`
+            : `Rejected — ${who} was not added to WiFi.`,
+        error: (err) =>
+          err instanceof Error ? err.message : "Something went wrong.",
+      }
+    );
   }
 
   async function handleLogout() {

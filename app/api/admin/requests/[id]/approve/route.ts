@@ -11,7 +11,7 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const updated = approveRequest(id);
+  const updated = await approveRequest(id);
 
   if (!updated) {
     return NextResponse.json(

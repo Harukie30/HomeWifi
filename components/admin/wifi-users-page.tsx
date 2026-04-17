@@ -51,12 +51,7 @@ export function WifiUsersPage() {
     }, 200);
   }
 
-  async function handleRemoveAccess(resident: Resident) {
-    const ok = window.confirm(
-      `Remove WiFi access for ${resident.name} (Unit ${resident.unit})?\n\nUse this when they move out. They can submit a new registration later if they return.`
-    );
-    if (!ok) return;
-
+  async function handleConfirmRemoveAccess(resident: Resident) {
     setRemovingId(resident.id);
     try {
       const response = await fetch(
@@ -66,12 +61,12 @@ export function WifiUsersPage() {
 
       if (response.status === 401) {
         router.push("/admin/login");
-        return;
+        throw new Error("Unauthorized");
       }
 
       if (!response.ok) {
         toast.error("Could not remove this user.");
-        return;
+        throw new Error("Remove failed");
       }
 
       toast.success(`${resident.name} was removed from WiFi access.`);
@@ -97,7 +92,7 @@ export function WifiUsersPage() {
         isLoading={isLoading}
         error={error}
         removingId={removingId}
-        onRemoveAccess={handleRemoveAccess}
+        onConfirmRemoveAccess={handleConfirmRemoveAccess}
       />
     </AdminDashboardShell>
   );

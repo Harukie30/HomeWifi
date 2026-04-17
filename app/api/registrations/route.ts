@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const created = createRegistrationRequest({
+  const created = await createRegistrationRequest({
     name: payload.name.trim(),
     unit: payload.unit.trim(),
     phone: payload.phone.trim(),

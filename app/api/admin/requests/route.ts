@@ -7,5 +7,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  return NextResponse.json({ requests: getRegistrationRequests() });
+  const requests = await getRegistrationRequests();
+  return NextResponse.json({ requests });
 }
